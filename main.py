@@ -5,7 +5,14 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import fetch_openml
 from sklearn.metrics import accuracy_score
+import torchvision.transforms as transforms
+from PIL import Image
+import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+
+save_path = "C:\\Users\\pedro\\PycharmProjects\\ui_3D\\models\\"
 
 # Set random seed for reproducibility
 seed = 42
@@ -37,9 +44,10 @@ train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
 # Model 1: Simple Feedforward Neural Network
-class SimpleNN(nn.Module):
+class Feed_Forward(nn.Module):
+
     def __init__(self):
-        super(SimpleNN, self).__init__()
+        super(Feed_Forward, self).__init__()
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(28 * 28, 128)
         self.relu = nn.ReLU()
@@ -52,7 +60,7 @@ class SimpleNN(nn.Module):
         x = self.fc2(x)
         return x
 
-model1 = SimpleNN()
+feed_forward = Feed_Forward()
 
 # Model 2: Convolutional Neural Network
 class CNN(nn.Module):
@@ -105,9 +113,8 @@ model3 = DeepNN()
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
-optimizer1 = optim.Adam(model1.parameters(), lr=0.001)
-optimizer2 = optim.Adam(model2.parameters(), lr=0.001)
-optimizer3 = optim.Adam(model3.parameters(), lr=0.001)
+optimizer1 = optim.Adam(feed_forward.parameters(), lr=0.001)
+
 
 # Train the models
 def train_model(model, optimizer, train_loader, epochs=5):
@@ -120,11 +127,11 @@ def train_model(model, optimizer, train_loader, epochs=5):
             loss.backward()
             optimizer.step()
         print(f'Epoch {epoch + 1}/{epochs}, Loss: {loss.item()}')
+    torch.save(model.state_dict(), 'model_state_dict.pth')
+
 
 # Training each model
-train_model(model1, optimizer1, train_loader)
-train_model(model2, optimizer2, train_loader)
-train_model(model3, optimizer3, train_loader)
+train_model(feed_forward, optimizer1, train_loader)
 
 # Evaluate the models on the test set
 def evaluate_model(model, test_loader):
@@ -140,12 +147,49 @@ def evaluate_model(model, test_loader):
             all_labels.extend(labels.numpy())
 
     accuracy = accuracy_score(all_labels, all_predictions)
-    return accuracy
+    return accuracy, all_labels, all_predictions
 
-accuracy1 = evaluate_model(model1, test_loader)
-accuracy2 = evaluate_model(model2, test_loader)
-accuracy3 = evaluate_model(model3, test_loader)
+# Assuming 'feed_forward' is your trained model and 'test_loader' is your DataLoader
+feed_forward_accuracy, true_labels, predicted_labels = evaluate_model(feed_forward, test_loader)
 
-print(f'Model 1 Accuracy: {accuracy1 * 100:.2f}%')
-print(f'Model 2 Accuracy: {accuracy2 * 100:.2f}%')
-print(f'Model 3 Accuracy: {accuracy3 * 100:.2f}%')
+print(f'Feed Forward Accuracy: {feed_forward_accuracy * 100:.2f}%')
+
+
+def class_accuracy(true_labels, predicted_labels, num_classes):
+    class_acc = []
+    for i in range(num_classes):
+        class_true = np.array(true_labels) == i
+        class_pred = np.array(predicted_labels) == i
+        acc = accuracy_score(class_true, class_pred)
+        class_acc.append(acc)
+    return class_acc
+
+class_accuracies = class_accuracy(true_labels, predicted_labels, num_classes=10)
+
+# Bar Chart for Overall Accuracy
+plt.figure(figsize=(8, 6))
+sns.barplot(x=['Feed Forward'], y=[feed_forward_accuracy], color='skyblue')
+plt.ylim(0, 1)  # Set y-axis limit to represent accuracy percentage
+plt.ylabel("Accuracy")
+plt.title("Overall Accuracy")
+plt.show()
+
+def clasify(model):
+    path = input("Path to image: ")
+    image = Image.open(path).convert('L')  # Convert to grayscale
+    transform = transforms.Compose([transforms.ToTensor()])
+    input_image = transform(image).unsqueeze(0)  # Add batch dimension
+    with torch.no_grad():
+        output = model(input_image)
+
+    # Get the predicted class
+    _, predicted_class = torch.max(output, 1)
+
+    print(f'The predicted class is: {predicted_class.item()}')
+    # Show the image
+    plt.imshow(image, cmap='gray')
+    plt.title(f'Predicted Class: {predicted_class.item()}')
+    plt.show()
+
+while True:
+    clasify(feed_forward)
