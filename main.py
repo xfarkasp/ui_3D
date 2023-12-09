@@ -18,7 +18,7 @@ def metric_calc(model_name,true_labels, predicted_labels, conf_matrix):
     sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", cbar=False)
     plt.xlabel("Predicted Label")
     plt.ylabel("True Label")
-    plt.title("Confusion Matrix")
+    plt.title(f"{model_name} Confusion Matrix")
     plt.show()
 
     accuracy = accuracy_score(true_labels, predicted_labels) * 100
@@ -150,11 +150,11 @@ def classify(model):
     with torch.no_grad():
         output = model(input_image)
 
-    # Get the predicted class
+    # Get predicted class
     _, predicted_class = torch.max(output, 1)
 
     print(f'The predicted class is: {predicted_class.item()}')
-    # Show the image
+    # Show inputed image
     plt.imshow(image, cmap='gray')
     plt.title(f'Predicted Number: {predicted_class.item()}')
     plt.show()
