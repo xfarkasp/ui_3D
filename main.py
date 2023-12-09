@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -11,8 +12,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
+import joblib
 
-def metric_calc(model_name,true_labels, predicted_labels, conf_matrix):
+
+def metric_calc(model_name, true_labels, predicted_labels, conf_matrix):
     # conf metrix visualization
     plt.figure(figsize=(10, 8))
     sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", cbar=False)
@@ -26,7 +29,7 @@ def metric_calc(model_name,true_labels, predicted_labels, conf_matrix):
     recall = recall_score(true_labels, predicted_labels, average='weighted') * 100
     f1 = f1_score(true_labels, predicted_labels, average='weighted') * 100
 
-    metrics = ['Accuracy' ,'Precision', 'Recall', 'F1-Score']
+    metrics = ['Accuracy', 'Precision', 'Recall', 'F1-Score']
     values = [accuracy, precision, recall, f1]
 
     plt.figure(figsize=(12, 6))
@@ -41,6 +44,7 @@ def metric_calc(model_name,true_labels, predicted_labels, conf_matrix):
     plt.ylabel("Values")
     plt.title(model_name)
     plt.show()
+
 
 # Feedforward
 class Feed_Forward(nn.Module):
@@ -59,6 +63,7 @@ class Feed_Forward(nn.Module):
         x = self.relu(x)
         x = self.fc2(x)
         return x
+
 
 # Cnn
 class CNN(nn.Module):
@@ -145,7 +150,7 @@ def classify(model):
         return
 
     image = Image.open(path).convert('L')  # Convert to grayscale
-    transform = transforms.Compose([transforms.ToTensor()])
+    transform = transforms.Compose([transforms.Resize((28, 28)), transforms.ToTensor()])
     input_image = transform(image).unsqueeze(0)  # Add batch dimension
     with torch.no_grad():
         output = model(input_image)
@@ -161,33 +166,38 @@ def classify(model):
 
 
 if __name__ == "__main__":
-    save_path = "C:\\Users\\pedro\\PycharmProjects\\ui_3D\\models\\"
-
+    print("setting up seed")
     # Set random seed for reproducibility
     seed = 42
     np.random.seed(seed)
     torch.manual_seed(seed)
 
-    # Load the MNIST dataset
-    mnist = fetch_openml('mnist_784')
-    X, y = mnist.data.astype('float32'), mnist.target.astype('int64')
+    file_path = 'mnist_dataset.joblib'
+    if os.path.exists(file_path):
+        mnist = joblib.load(file_path)
+        X = mnist.data.astype('float32')
+        y = mnist.target.astype('int64')
+    else:
+        print(f"The file {file_path} does not exist. You may need to download the dataset first.")
+        print("downloading MNIST MNIST dataset")
+        mnist = fetch_openml('mnist_784', version=1, parser='auto')
+        joblib.dump(mnist, 'mnist_dataset.joblib')
+        X, y = mnist.data.astype('float32'), mnist.target.astype('int64')
 
-    # Normalize pixel values to be between 0 and 1
-    X /= 255.0
+        print("normalizing pixels")
+        # normalization of pixels
+        X /= 255.0
 
-    # Split the dataset into training and testing sets
+    print("splitting the dataset")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Convert NumPy arrays to PyTorch tensors
-    # X_train_tensor = torch.from_numpy(X_train.values).float()
+    print("Converting NumPy arrays to PyTorch tensors")
     X_train_tensor = torch.from_numpy(X_train.values.reshape(-1, 1, 28, 28)).float()
     y_train_tensor = torch.from_numpy(y_train.values).long()
-
-    # X_test_tensor = torch.from_numpy(X_test.values).float()
     X_test_tensor = torch.from_numpy(X_test.values.reshape(-1, 1, 28, 28)).float()
     y_test_tensor = torch.from_numpy(y_test.values).long()
 
-    # Create DataLoader for training and testing sets
+    print("creating dataloaders for train and testing sets")
     train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
     test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
 
@@ -198,7 +208,7 @@ if __name__ == "__main__":
 
     while True:
         print(
-            "Menu:\n 1.Train model\n 2.Load model\n 3.Test model\n 4. Train and Test model\n 5.Classify snipets\n 6.Save model")
+            "Menu:\n___________________________\n 1.Train model\n 2.Load model\n 3.Test model\n 4. Train and Test model\n 5.Classify snipets\n 6.Save model\n___________________________")
         user_input = input("Input: ")
         if user_input == '1':
             print("Models:\n 1. Feed Forward \n 2. CNN \n 3. Deep")
@@ -236,9 +246,13 @@ if __name__ == "__main__":
                 train_model(model, optimizer, train_loader)
                 current_model = model
 
-        # elif user_input == '2':
-        #     load_path = input("Path to model: ")
-        #     current_model = torch.load(load_path)
+
+        elif user_input == '2':
+            load_path = input("Path to model: ")
+            current_model = Feed_Forward()  # Create an instance of the model
+            current_model.load_state_dict(torch.load(load_path))
+            current_model.eval()
+            print("Model loaded successfully!")
 
         elif user_input == '3':
             if current_model != None:
@@ -264,10 +278,12 @@ if __name__ == "__main__":
             while True:
                 classify(current_model)
 
+
         elif user_input == '6':
-            if current_model != None:
-                save_path = input("Path to save model")
-                torch.save(current_model.state_dict(), save_path + current_model.model_name +'.pth')
+            if current_model is not None:
+                save_path = input("Directory to save model: ")
+                save_path = os.path.join(save_path, current_model.model_name + '.pth')
+                torch.save(current_model.state_dict(), save_path)
             else:
                 print("No model was trained or loaded")
 
